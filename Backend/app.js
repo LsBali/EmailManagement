@@ -5,6 +5,8 @@ const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const mongoose = require("mongoose");
+// const userRoutes = require("./routes/userRoutes");
+const userAuthRoutes = require("./routes/userAuthRoutes")
 
 main().then(res => {
     console.log("DB connected successfully")
@@ -21,6 +23,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({extended: true}))
 app.use(cookieParser());
+
+app.use("/auth", userAuthRoutes )
 
 app.get("/", (req, res) => {
     res.send("i am backend")
