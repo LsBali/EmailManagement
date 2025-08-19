@@ -10,6 +10,7 @@ const startEmailListener = require('./services/mailParser');
 const emailRoutes = require("./routes/emaildata")
 const empRoutes = require("./routes/employeeRoutes")
 const adminRoutes = require("./routes/adminRoutes")
+const path = require('path');
 
 async function main() {
     try {
@@ -34,6 +35,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 app.use(cookieParser());
 
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 app.use('/emails', emailRoutes);

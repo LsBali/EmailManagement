@@ -1,4 +1,38 @@
 const emailModel = require('../models/emailModel');
+const { sendEmail } = require('../services/emailService');
+
+// Helpers to build fixed email templates for approval/rejection
+function formatDate(date) {
+	if (!date) return '';
+	try {
+		const d = new Date(date);
+		return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+	} catch {
+		return String(date);
+	}
+}
+
+function buildApprovalTemplate(item, adminName) {
+	const subject = 'Request Approved';
+	const text = `Dear Employee,\n\nYour leave request has been approved.\n\nRegards,\nAdmin`;
+	const html = `
+		<p>Dear Employee,</p>
+		<p>Your leave request has been approved.</p>
+		<p>Regards,<br/>Admin</p>
+	`;
+	return { subject, text, html };
+}
+
+function buildRejectionTemplate(item, adminName) {
+	const subject = 'Request Rejected';
+	const text = `Dear Employee,\n\nYour leave request has been rejected.\n\nRegards,\nAdmin`;
+	const html = `
+		<p>Dear Employee,</p>
+		<p>Your leave request has been rejected.</p>
+		<p>Regards,<br/>Admin</p>
+	`;
+	return { subject, text, html };
+}
 
 module.exports.listLeaveRequests = async function (req, res) {
     try {
@@ -37,7 +71,16 @@ module.exports.approveLeaveRequest = async function (req, res) {
         item.reviewedBy = req.user._id;
         item.reviewedAt = new Date();
         await item.save();
-        return res.status(200).json({ message: 'Leave request approved', email: item });
+        // Send fixed approval email template
+        try {
+            const adminName = req.user?.fullname ? `${req.user.fullname.firstname} ${req.user.fullname.lastname}`.trim() : 'Admin';
+            const { subject, text, html } = buildApprovalTemplate(item, adminName);
+            await sendEmail({ to: item.employeeEmail, subject, text, html });
+            return res.status(200).json({ message: 'Leave request approved', email: item, emailSent: true });
+        } catch (mailErr) {
+            console.error('Failed to send approval email:', mailErr);
+            return res.status(200).json({ message: 'Leave request approved (email failed to send)', email: item, emailSent: false });
+        }
     } catch (err) {
         return res.status(500).json({ message: err.message });
     }
@@ -55,7 +98,16 @@ module.exports.rejectLeaveRequest = async function (req, res) {
         item.reviewedBy = req.user._id;
         item.reviewedAt = new Date();
         await item.save();
-        return res.status(200).json({ message: 'Leave request rejected', email: item });
+        // Send fixed rejection email template
+        try {
+            const adminName = req.user?.fullname ? `${req.user.fullname.firstname} ${req.user.fullname.lastname}`.trim() : 'Admin';
+            const { subject, text, html } = buildRejectionTemplate(item, adminName);
+            await sendEmail({ to: item.employeeEmail, subject, text, html });
+            return res.status(200).json({ message: 'Leave request rejected', email: item, emailSent: true });
+        } catch (mailErr) {
+            console.error('Failed to send rejection email:', mailErr);
+            return res.status(200).json({ message: 'Leave request rejected (email failed to send)', email: item, emailSent: false });
+        }
     } catch (err) {
         return res.status(500).json({ message: err.message });
     }
@@ -69,6 +121,27 @@ module.exports.summaryStats = async function (req, res) {
             emailModel.countDocuments({ status: 'Rejected' })
         ]);
         return res.status(200).json({ pending, approved, rejected });
+    } catch (err) {
+        return res.status(500).json({ message: err.message });
+    }
+};
+
+// Admin sends feedback email to an employee via common email
+module.exports.sendFeedbackToEmployee = async function (req, res) {
+    try {
+        const { toEmail, subject, message } = req.body;
+        if (!toEmail || !subject || !message) {
+            return res.status(400).json({ message: 'toEmail, subject and message are required' });
+        }
+
+        const html = `
+            <p>${message.replace(/\n/g, '<br/>')}</p>
+            <hr/>
+            <p style="font-size:12px;color:#6b7280">This message was sent by Admin via DYP Company Leave System.</p>
+        `;
+
+        await sendEmail({ to: toEmail, subject, html, text: message });
+        return res.status(200).json({ message: 'Feedback email sent' });
     } catch (err) {
         return res.status(500).json({ message: err.message });
     }

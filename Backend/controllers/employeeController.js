@@ -33,6 +33,16 @@ module.exports.createLeaveRequestEmail = async function (req, res) {
         const rawEmailId = `form-${String(employeeId)}-${Date.now()}-${crypto.randomBytes(6).toString('hex')}`;
 
         const employeeName = `${req.user.fullname.firstname} ${req.user.fullname.middlename} ${req.user.fullname.lastname}`.replace(/\s+/g, ' ').trim();
+        // Map uploaded files (if any) to attachments array
+        const attachments = Array.isArray(req.files)
+            ? req.files.map(f => ({
+                filename: f.originalname,
+                mimetype: f.mimetype,
+                size: f.size,
+                path: `/uploads/${f.filename}`
+            }))
+            : [];
+
         const record = new emailModel({
             employee: employeeId,
             employeeName,
@@ -43,7 +53,7 @@ module.exports.createLeaveRequestEmail = async function (req, res) {
             startDate: start,
             endDate: end,
             rawEmailId,
-            attachments: []
+            attachments
         });
 
         await record.save();

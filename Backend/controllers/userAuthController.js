@@ -1,5 +1,6 @@
 const userModel = require('../models/userModel');
 const crypto = require('crypto');
+const { sendEmail } = require('../services/emailService');
 
 module.exports.registerUser = async function (req, res) {
     try {
@@ -42,6 +43,7 @@ module.exports.registerUser = async function (req, res) {
 
         res.status(201).json({
             message: "User registered successfully",
+            token,
             user: { id: user._id, email: user.email, mobile: user.mobile, role: user.role }
         });
     } catch (err) {
@@ -74,6 +76,7 @@ module.exports.loginUser = async function (req, res) {
         
         res.status(200).json({
             message: "Login successful",
+            token,
             user: { id: user._id, email: user.email, role: user.role }
         });
     } catch (err) {
@@ -88,7 +91,8 @@ module.exports.userProfile = async function (req, res) {
             fullname: req.user.fullname,
             email: req.user.email,
             role: req.user.role,
-            department: req.user.department
+            department: req.user.department,
+            profilePhoto: req.user.profilePhoto || null
         });
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -194,8 +198,24 @@ module.exports.forgotPassword = async function (req, res) {
         const rawToken = user.createPasswordResetToken();
         await user.save({ validateBeforeSave: false });
 
-        // In a real app, send rawToken via email. Here we return it for testing purposes only.
-        res.status(200).json({ message: "Password reset token generated", resetToken: rawToken });
+        const resetUrl = `${process.env.FRONTEND_BASE_URL || 'http://localhost:5173'}/reset-password/${rawToken}`;
+        const subject = 'Reset your DYP Company account password';
+        const html = `
+            <p>Hi ${user.fullname?.firstname || ''},</p>
+            <p>You recently requested to reset your password. Click the button below to reset it. This link will expire in 10 minutes.</p>
+            <p><a href="${resetUrl}" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px">Reset Password</a></p>
+            <p>Or copy and paste this link into your browser:</p>
+            <p><a href="${resetUrl}">${resetUrl}</a></p>
+            <p>If you did not request a password reset, you can safely ignore this email.</p>
+        `;
+        try {
+            await sendEmail({ to: user.email, subject, html, text: `Reset your password: ${resetUrl}` });
+        } catch (mailErr) {
+            // Even if email fails, don't leak existence. Provide generic response.
+            console.error('Reset email send failed:', mailErr.message);
+        }
+
+        return res.status(200).json({ message: "If that email is registered, you'll receive a reset link" });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
@@ -227,6 +247,27 @@ module.exports.resetPasswordWithToken = async function (req, res) {
         await user.save();
 
         res.status(200).json({ message: "Password has been reset successfully" });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+// Upload profile photo
+module.exports.uploadProfilePhoto = async function (req, res) {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const publicPath = `/uploads/${req.file.filename}`;
+
+        const user = await userModel.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        user.profilePhoto = publicPath;
+        await user.save({ validateBeforeSave: false });
+
+        res.status(200).json({ message: 'Profile photo updated', profilePhoto: publicPath });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

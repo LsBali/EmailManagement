@@ -9,5 +9,6 @@ router.get('/leave-requests/:id', authUser, requireAdmin, adminController.getLea
 router.post('/leave-requests/:id/approve', authUser, requireAdmin, adminController.approveLeaveRequest);
 router.post('/leave-requests/:id/reject', authUser, requireAdmin, adminController.rejectLeaveRequest);
 router.get('/stats', authUser, requireAdmin, adminController.summaryStats);
+router.post('/feedback', authUser, requireAdmin, adminController.sendFeedbackToEmployee);
 
 module.exports = router;

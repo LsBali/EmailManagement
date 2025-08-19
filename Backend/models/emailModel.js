@@ -23,10 +23,10 @@ const emailDataSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-      leaveType: {
-    type: String,
-    default: "Other",
-  },
+    leaveType: {
+        type: String,
+        default: "Other",
+    },
     startDate: {
         type: Date,
     },
@@ -51,8 +51,7 @@ const emailDataSchema = new mongoose.Schema({
     },
     rawEmailId: {
         type: String,
-        unique: true,
-        required: true,
+        unique: true
     },
     attachments: [
         {
@@ -71,6 +70,12 @@ const emailDataSchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
     }
+});
+
+// Auto-update the updatedAt timestamp on each save
+emailDataSchema.pre('save', function (next) {
+    this.updatedAt = new Date();
+    next();
 });
 
 const emailModel = mongoose.model("EmailData", emailDataSchema);

@@ -77,6 +77,10 @@ const userSchema = new mongoose.Schema({
         usedMedical: { type: Number, default: 0 },
         usedOthers: { type: Number, default: 0 }
     },
+    profilePhoto: {
+        type: String,
+        default: null
+    },
     passwordResetToken: {
         type: String,
         select: false
