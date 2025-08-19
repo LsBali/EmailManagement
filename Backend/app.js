@@ -29,8 +29,13 @@ async function main() {
 main();
 
 const app = express();
+const PORT = process.env.PORT || 5000;
+const ALLOWED_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:8080';
 
-app.use(cors());
+app.use(cors({
+    origin: ALLOWED_ORIGIN,
+    credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 app.use(cookieParser());
@@ -38,17 +43,28 @@ app.use(cookieParser());
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// API routes are mounted under both base path and /api for flexibility
 
-app.use('/emails', emailRoutes);
 
-app.use("/auth", userAuthRoutes)
-app.use("/employee", empRoutes);
-app.use("/admin", adminRoutes);
+app.use(['/emails', '/api/emails'], emailRoutes);
 
-app.get("/", (req, res) => {
-    res.send("i am backend")
+app.use(["/auth", "/api/auth"], userAuthRoutes)
+app.use(["/employee", "/api/employee"], empRoutes);
+app.use(["/admin", "/api/admin"], adminRoutes);
+
+app.get("/health", (req, res) => {
+    res.json({ ok: true });
 })
 
-app.listen(process.env.PORT, () => {
-    console.log(`server started on port ${process.env.PORT}`);
+// Serve frontend in production
+if (process.env.NODE_ENV === 'production') {
+    const frontendDist = path.join(__dirname, '..', 'Frontend', 'dist');
+    app.use(express.static(frontendDist));
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(frontendDist, 'index.html'));
+    });
+}
+
+app.listen(PORT, () => {
+    console.log(`server started on port ${PORT}`);
 })
