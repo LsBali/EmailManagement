@@ -23,3 +23,10 @@ module.exports.authUser = async (req, res, next) => {
         return res.status(401).json({ message: "Unauthorized user" });
     }
 };
+
+module.exports.requireAdmin = (req, res, next) => {
+    if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Forbidden: Admins only' });
+    }
+    next();
+};

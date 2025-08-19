@@ -1,0 +1,12 @@
+const express = require('express');
+const { authUser } = require('../middlewares/userAuthMiddleware');
+const employeeController = require('../controllers/employeeController');
+
+const router = express.Router();
+
+router.post('/leave-email', authUser, employeeController.createLeaveRequestEmail);
+router.get('/leave-email', authUser, employeeController.listMyLeaveRequestEmails);
+router.get('/leave-email/:id', authUser, employeeController.getMyLeaveRequestEmail);
+router.post('/leave-email/:id/cancel', authUser, employeeController.cancelMyLeaveRequestEmail);
+
+module.exports = router;

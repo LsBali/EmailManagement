@@ -4,7 +4,16 @@ const emailDataSchema = new mongoose.Schema({
     employee: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
+        required: false,
+    },
+    employeeName: {
+        type: String,
         required: true,
+    },
+    employeeEmail: {
+        type: String,
+        required: true,
+        lowercase: true,
     },
     subject: {
         type: String,
@@ -14,18 +23,15 @@ const emailDataSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    leaveType: {
-        type: String,
-        enum: ["Sick Leave", "Casual Leave", "Paid Leave", "Other"],
-        default: "Other",
-    },
+      leaveType: {
+    type: String,
+    default: "Other",
+  },
     startDate: {
         type: Date,
-        required: true,
     },
     endDate: {
         type: Date,
-        required: true,
     },
     status: {
         type: String,
@@ -44,7 +50,7 @@ const emailDataSchema = new mongoose.Schema({
         type: Date,
     },
     rawEmailId: {
-        type: String, // Gmail/IMAP UID or Message-ID
+        type: String,
         unique: true,
         required: true,
     },
