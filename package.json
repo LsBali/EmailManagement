@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "name": "vite_react_shadcn_ts",
   "private": true,
   "version": "0.0.0",
@@ -85,4 +86,16 @@
     "typescript-eslint": "^8.38.0",
     "vite": "^5.4.19"
   }
+=======
+  "name": "emailmanagement",
+  "version": "1.0.0",
+  "description": "EmailManagement is a web-based system designed to manage employee email-based leave requests efficiently. It streamlines communication between employees and managers, tracks leave balances, and automates approval workflows.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+>>>>>>> bc3b78b006d7c4bafdd8be5c28071f6b62257eef
 }
