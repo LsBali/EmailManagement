@@ -52,11 +52,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onBack }) => {
         setSubmitStatus('success');
         setSubmitMessage('Signed in successfully! Redirecting...');
         
-        // Store user info for role-based routing (fallback for demo)
-        const userRole = data.role || 'employee';
-        const userFirstName = data.firstName || 'User';
+        // Store user info for role-based routing
+        const userDetails = {
+          email: values.email,
+          role: data.role || 'employee',
+          firstName: data.firstName || 'User',
+          ...data
+        };
+        localStorage.setItem('userDetails', JSON.stringify(userDetails));
+        const userRole = userDetails.role;
         localStorage.setItem('userRole', userRole);
-        localStorage.setItem('userFirstName', userFirstName);
         
         setTimeout(() => {
           // Redirect based on role
@@ -78,8 +83,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onBack }) => {
       // For demo purposes, determine role based on email or set default
       const userRole = values.email.includes('admin') ? 'admin' : 'employee';
       const userFirstName = values.email.split('@')[0] || 'User';
+      const userDetails = {
+        email: values.email,
+        firstName: userFirstName,
+        lastName: 'User',
+        role: userRole,
+        department: userRole === 'admin' ? 'Engineering' : 'Marketing',
+        phoneNumber: '+1234567890'
+      };
+      localStorage.setItem('userDetails', JSON.stringify(userDetails));
       localStorage.setItem('userRole', userRole);
-      localStorage.setItem('userFirstName', userFirstName);
       
       setTimeout(() => {
         if (userRole === 'admin') {

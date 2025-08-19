@@ -137,8 +137,9 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onBack }) => {
         setSubmitStatus('success');
         setSubmitMessage('Account created successfully! Redirecting to dashboard...');
         
-        // Store user's first name and role for personalization
-        localStorage.setItem('userFirstName', values.firstName);
+        // Store user's details for personalization
+        const { password, confirmPassword, ...userDetails } = values;
+        localStorage.setItem('userDetails', JSON.stringify(userDetails));
         localStorage.setItem('userRole', values.role);
         
         // Redirect based on role after 1 second
@@ -158,8 +159,9 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onBack }) => {
       setSubmitStatus('success');
       setSubmitMessage('Account created! Redirecting to dashboard...');
       
-      // Store user's first name and role for personalization (fallback case)
-      localStorage.setItem('userFirstName', values.firstName);
+      // Store user's details for personalization (fallback case)
+      const { password, confirmPassword, ...userDetails } = values;
+      localStorage.setItem('userDetails', JSON.stringify(userDetails));
       localStorage.setItem('userRole', values.role);
       
       setTimeout(() => {

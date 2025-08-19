@@ -8,7 +8,9 @@ import Dashboard from "./pages/Dashboard";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
 import NotFound from "./pages/NotFound";
+import Profile from "./pages/Profile";
 import { RoleGuard } from "./components/role-guard";
 
 const queryClient = new QueryClient();
@@ -39,7 +41,16 @@ const App = () => (
           />
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route 
+            path="/profile" 
+            element={
+              <RoleGuard allowedRoles={['admin', 'employee']} redirectTo="/login">
+                <Profile />
+              </RoleGuard>
+            }
+          />
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL \"*\" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
