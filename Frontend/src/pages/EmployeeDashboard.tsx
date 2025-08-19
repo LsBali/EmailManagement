@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import Sidebar from '@/components/sidebar';
 import Header from '@/components/header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,12 +47,15 @@ interface LeaveFormValues {
   attachments: FileList | null;
 }
 
-// Mock data for employee's leave history
-const employeeLeaveHistory = [
-  { id: "REQ-2001", type: "Sick Leave", startDate: "2025-07-15", endDate: "2025-07-16", status: "Approved", reason: "Fever and cold" },
-  { id: "REQ-2002", type: "Medical Leave", startDate: "2025-06-20", endDate: "2025-06-22", status: "Approved", reason: "Medical checkup" },
-  { id: "REQ-2003", type: "Sick Leave", startDate: "2025-08-10", endDate: "2025-08-10", status: "Pending", reason: "Stomach flu" },
-];
+// Types and state for fetched leave history
+interface LeaveRequestItem {
+  _id: string;
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  leaveReason: string;
+}
 
 const leaveBalance = {
   sickLeave: { used: 5, total: 12, remaining: 7 },
@@ -70,6 +73,9 @@ const EmployeeDashboard: React.FC = () => {
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [submitMessage, setSubmitMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [myRequests, setMyRequests] = useState<LeaveRequestItem[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState<boolean>(false);
+  const [errorRequests, setErrorRequests] = useState<string>('');
 
   const userDetails = useMemo(() => {
     const storedDetails = localStorage.getItem('userDetails');
@@ -92,6 +98,40 @@ const EmployeeDashboard: React.FC = () => {
     endDate: '',
     attachments: null,
   };
+
+  const fetchMyRequests = async () => {
+    try {
+      setLoadingRequests(true);
+      setErrorRequests('');
+      const response = await fetch(`${API_BASE_URL}/employee/leave-email`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        const items = (data as any).emails as any[];
+        const mapped: LeaveRequestItem[] = (items || []).map((it) => ({
+          _id: it._id,
+          leaveType: it.leaveType || 'Other',
+          startDate: it.startDate,
+          endDate: it.endDate,
+          status: it.status,
+          leaveReason: it.leaveReason,
+        }));
+        setMyRequests(mapped);
+      } else {
+        setErrorRequests((data as any).message || 'Failed to load requests');
+      }
+    } catch (err) {
+      setErrorRequests('Failed to load requests');
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMyRequests();
+  }, []);
 
   const handleSubmit = async (values: LeaveFormValues, { resetForm }: any) => {
     setIsSubmitting(true);
@@ -124,6 +164,7 @@ const EmployeeDashboard: React.FC = () => {
         setSubmitMessage('Leave request submitted successfully!');
         resetForm();
         setTimeout(() => setSubmitStatus('idle'), 3000);
+        fetchMyRequests();
       } else {
         const data = await response.json().catch(() => ({}));
         setSubmitStatus('error');
@@ -136,6 +177,20 @@ const EmployeeDashboard: React.FC = () => {
       setTimeout(() => setSubmitStatus('idle'), 3000);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelRequest = async (id: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/employee/leave-email/${id}/cancel`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (response.ok) {
+        fetchMyRequests();
+      }
+    } catch (err) {
+      // ignore
     }
   };
 
@@ -194,9 +249,7 @@ const EmployeeDashboard: React.FC = () => {
                     <Clock className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">
-                      {employeeLeaveHistory.filter(req => req.status === 'Pending').length}
-                    </div>
+                    <div className="text-2xl font-bold">{myRequests.filter(req => req.status === 'Pending').length}</div>
                     <p className="text-xs text-muted-foreground">awaiting approval</p>
                   </CardContent>
                 </Card>
@@ -206,9 +259,7 @@ const EmployeeDashboard: React.FC = () => {
                     <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">
-                      {employeeLeaveHistory.filter(req => req.status === 'Approved').length}
-                    </div>
+                    <div className="text-2xl font-bold">{myRequests.filter(req => req.status === 'Approved').length}</div>
                     <p className="text-xs text-muted-foreground">requests approved</p>
                   </CardContent>
                 </Card>
@@ -394,14 +445,31 @@ const EmployeeDashboard: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {employeeLeaveHistory.map((request) => (
-                        <TableRow key={request.id}>
-                          <TableCell className="font-medium">{request.id}</TableCell>
-                          <TableCell>{request.type}</TableCell>
-                          <TableCell>{request.startDate}</TableCell>
-                          <TableCell>{request.endDate}</TableCell>
-                          <TableCell>{getStatusBadge(request.status)}</TableCell>
-                          <TableCell className="max-w-xs truncate">{request.reason}</TableCell>
+                      {loadingRequests && (
+                        <TableRow>
+                          <TableCell colSpan={6}>Loading...</TableCell>
+                        </TableRow>
+                      )}
+                      {!loadingRequests && errorRequests && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-destructive">{errorRequests}</TableCell>
+                        </TableRow>
+                      )}
+                      {!loadingRequests && !errorRequests && myRequests.map((request) => (
+                        <TableRow key={request._id}>
+                          <TableCell className="font-medium">{request._id.slice(-6).toUpperCase()}</TableCell>
+                          <TableCell>{request.leaveType}</TableCell>
+                          <TableCell>{new Date(request.startDate).toLocaleDateString()}</TableCell>
+                          <TableCell>{new Date(request.endDate).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {getStatusBadge(request.status)}
+                              {request.status === 'Pending' && (
+                                <Button size="sm" variant="outline" onClick={() => handleCancelRequest(request._id)}>Cancel</Button>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate">{request.leaveReason}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

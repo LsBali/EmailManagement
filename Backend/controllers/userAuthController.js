@@ -4,7 +4,7 @@ const { sendEmail } = require('../services/emailService');
 
 module.exports.registerUser = async function (req, res) {
     try {
-        const { firstname, middlename, lastname, email, mobile, password, confirmPassword, department } = req.body;
+        const { firstname, middlename, lastname, email, mobile, password, confirmPassword, department, role } = req.body;
 
         if (!firstname || !middlename || !lastname || !email || !mobile || !password || !confirmPassword || !department) {
             return res.status(400).json({ message: "All fields are required" });
@@ -26,7 +26,8 @@ module.exports.registerUser = async function (req, res) {
             email,
             mobile,
             password,
-            department
+            department,
+            role: role && ["employee", "admin"].includes(role) ? role : undefined
         });
         user.confirmPassword = confirmPassword;
 
@@ -198,7 +199,7 @@ module.exports.forgotPassword = async function (req, res) {
         const rawToken = user.createPasswordResetToken();
         await user.save({ validateBeforeSave: false });
 
-        const resetUrl = `${process.env.FRONTEND_BASE_URL || 'http://localhost:5173'}/reset-password/${rawToken}`;
+        const resetUrl = `${process.env.FRONTEND_BASE_URL || 'http://localhost:8080'}/reset-password/${rawToken}`;
         const subject = 'Reset your DYP Company account password';
         const html = `
             <p>Hi ${user.fullname?.firstname || ''},</p>

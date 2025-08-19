@@ -1,4 +1,6 @@
 import React from "react";
+import { useEffect, useState } from "react";
+import { API_BASE_URL } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,12 +33,22 @@ import { AnalyticsFilters } from '@/components/analytics-filters';
 import Sidebar from '@/components/sidebar';
 import Header from '@/components/header';
 
-// Mock data
-const pendingRequests = [
-  { id: "REQ-1024", employee: "Aarav Shah", type: "Casual Leave", days: 2, submitted: "2025-08-16", priority: "High" },
-  { id: "REQ-1025", employee: "Neha Verma", type: "Sick Leave", days: 1, submitted: "2025-08-17", priority: "Medium" },
-  { id: "REQ-1026", employee: "Rahul Kumar", type: "Work From Home", days: 1, submitted: "2025-08-18", priority: "Low" },
-];
+// Types for admin leave requests and stats
+interface AdminLeaveItem {
+  _id: string;
+  employeeName: string;
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  receivedAt: string;
+}
+
+interface AdminStats {
+  pending: number;
+  approved: number;
+  rejected: number;
+}
 
 const onLeaveToday = [
   { name: "Priya Singh", team: "Design", type: "CL" },
@@ -179,6 +191,50 @@ const Dashboard: React.FC = () => {
     teamAvailability,
     leaveTypeDist,
   });
+
+  const [pendingRequests, setPendingRequests] = useState<AdminLeaveItem[]>([]);
+  const [adminStats, setAdminStats] = useState<AdminStats>({ pending: 0, approved: 0, rejected: 0 });
+  const [loadingList, setLoadingList] = useState(false);
+  const [errorList, setErrorList] = useState('');
+
+  const loadAdminData = async () => {
+    try {
+      setLoadingList(true);
+      setErrorList('');
+      const [listRes, statsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/admin/leave-requests?status=Pending`, { credentials: 'include' }),
+        fetch(`${API_BASE_URL}/admin/stats`, { credentials: 'include' }),
+      ]);
+      const listJson = await listRes.json().catch(() => ({}));
+      const statsJson = await statsRes.json().catch(() => ({}));
+      if (listRes.ok) {
+        const items = (listJson as any).emails as any[];
+        const mapped: AdminLeaveItem[] = (items || []).map((it) => ({
+          _id: it._id,
+          employeeName: it.employeeName || 'Unknown',
+          leaveType: it.leaveType || 'Other',
+          startDate: it.startDate,
+          endDate: it.endDate,
+          status: it.status,
+          receivedAt: it.receivedAt,
+        }));
+        setPendingRequests(mapped);
+      } else {
+        setErrorList((listJson as any).message || 'Failed to load requests');
+      }
+      if (statsRes.ok) {
+        setAdminStats(statsJson as AdminStats);
+      }
+    } catch (err) {
+      setErrorList('Failed to load data');
+    } finally {
+      setLoadingList(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAdminData();
+  }, []);
 
   const applyFilters = () => {
     // A real app would likely refetch data or use a more robust client-side filtering library.
@@ -374,7 +430,14 @@ const Dashboard: React.FC = () => {
                           <CheckCircle2 className="h-4 w-4 text-violet-500" />
                         </CardHeader>
                         <CardContent>
-                          <div className="text-2xl font-bold">92%</div>
+                          <div className="text-2xl font-bold">{
+                            (() => {
+                              const total = adminStats.approved + adminStats.rejected;
+                              if (total === 0) return '0%';
+                              const rate = Math.round((adminStats.approved / total) * 100);
+                              return `${rate}%`;
+                            })()
+                          }</div>
                           <p className="text-xs text-muted-foreground">+1.2% from last month</p>
                         </CardContent>
                       </Card>
@@ -640,16 +703,32 @@ const Dashboard: React.FC = () => {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {pendingRequests.map((req) => (
-                                  <TableRow key={req.id}>
-                                    <TableCell>{req.employee}</TableCell>
-                                    <TableCell>{req.type}</TableCell>
-                                    <TableCell>{req.days}</TableCell>
-                                    <TableCell>{req.submitted}</TableCell>
+                                {loadingList && (
+                                  <TableRow>
+                                    <TableCell colSpan={5}>Loading...</TableCell>
+                                  </TableRow>
+                                )}
+                                {!loadingList && errorList && (
+                                  <TableRow>
+                                    <TableCell colSpan={5} className="text-destructive">{errorList}</TableCell>
+                                  </TableRow>
+                                )}
+                                {!loadingList && !errorList && pendingRequests.map((req) => (
+                                  <TableRow key={req._id}>
+                                    <TableCell>{req.employeeName}</TableCell>
+                                    <TableCell>{req.leaveType}</TableCell>
+                                    <TableCell>{new Date(req.startDate).toLocaleDateString()} - {new Date(req.endDate).toLocaleDateString()}</TableCell>
+                                    <TableCell>{new Date(req.receivedAt).toLocaleDateString()}</TableCell>
                                     <TableCell>
                                       <div className="flex gap-2">
-                                        <Button variant="outline" size="sm">Approve</Button>
-                                        <Button variant="destructive" size="sm">Reject</Button>
+                                        <Button variant="outline" size="sm" onClick={async () => {
+                                          const res = await fetch(`${API_BASE_URL}/admin/leave-requests/${req._id}/approve`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminRemarks: '' }) });
+                                          if (res.ok) loadAdminData();
+                                        }}>Approve</Button>
+                                        <Button variant="destructive" size="sm" onClick={async () => {
+                                          const res = await fetch(`${API_BASE_URL}/admin/leave-requests/${req._id}/reject`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adminRemarks: '' }) });
+                                          if (res.ok) loadAdminData();
+                                        }}>Reject</Button>
                                       </div>
                                     </TableCell>
                                   </TableRow>

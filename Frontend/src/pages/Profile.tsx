@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_BASE_URL } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { User, Mail, Building, Phone, UserCheck } from 'lucide-react';
@@ -19,24 +20,37 @@ const Profile: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    const storedUserDetails = localStorage.getItem('userDetails');
-    if (storedUserDetails) {
-      setUserDetails(JSON.parse(storedUserDetails));
-    } else {
-      // Fallback for users registered before the change
-      const firstName = localStorage.getItem('userFirstName');
-      const role = localStorage.getItem('userRole');
-      if (firstName && role) {
-        setUserDetails({
-          firstName,
-          lastName: 'User',
-          email: 'user@example.com',
-          role,
-          department: 'General',
-          phoneNumber: 'N/A',
-        });
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/profile`, { credentials: 'include' });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          const mapped: UserDetails = {
+            firstName: data?.fullname?.firstname || 'User',
+            middleName: data?.fullname?.middlename || '',
+            lastName: data?.fullname?.lastname || '',
+            email: data?.email || '',
+            role: data?.role || 'employee',
+            department: data?.department || '',
+            phoneNumber: data?.mobile || '',
+          };
+          setUserDetails(mapped);
+          localStorage.setItem('userDetails', JSON.stringify(mapped));
+          localStorage.setItem('userRole', mapped.role);
+        } else {
+          const storedUserDetails = localStorage.getItem('userDetails');
+          if (storedUserDetails) {
+            setUserDetails(JSON.parse(storedUserDetails));
+          }
+        }
+      } catch {
+        const storedUserDetails = localStorage.getItem('userDetails');
+        if (storedUserDetails) {
+          setUserDetails(JSON.parse(storedUserDetails));
+        }
       }
-    }
+    };
+    fetchProfile();
   }, []);
 
   const handleUpdateDetails = (updatedDetails: UserDetails) => {

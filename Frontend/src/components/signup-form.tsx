@@ -128,6 +128,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onBack }) => {
         password: payload.password,
         confirmPassword: confirmPassword,
         department: payload.department,
+        role: values.role,
       };
       
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
