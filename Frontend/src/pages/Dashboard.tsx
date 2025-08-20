@@ -55,10 +55,31 @@ interface AdminStats {
   rejected: number;
 }
 
-const onLeaveToday = [
-  { name: "Priya Singh", team: "Design", type: "CL" },
-  { name: "Vikram Patel", team: "Backend", type: "SL" },
-];
+// New interfaces for calendar data
+interface EmployeeOnLeave {
+  name: string;
+  type: string;
+  startDate: string;
+  endDate: string;
+}
+
+interface UpcomingLeave {
+  name: string;
+  date: string;
+  type: string;
+  startDate: string;
+  endDate: string;
+}
+
+interface CalendarData {
+  employeeName: string;
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+  type: string;
+}
+
+// Static data removed - now using dynamic API data
 
 const approvalTrend = [
   { month: "Jan", rate: 78 },
@@ -142,11 +163,7 @@ const priorityQueue = [
   { id: "REQ-1025", employee: "Neha Verma", reason: "Fever", ageHrs: 15, priority: "Medium" },
 ];
 
-const upcomingLeaves = [
-  { name: "Rohan Mehta", date: "2025-08-20", team: "Frontend" },
-  { name: "Sneha Iyer", date: "2025-08-21", team: "HR" },
-  { name: "Pooja Das", date: "2025-08-23", team: "Data" },
-];
+// Static upcoming leaves data removed - now using dynamic API data
 
 const allHolidays = [
   { name: "Independence Day", date: "2025-08-15", type: "National Holiday" },
@@ -172,6 +189,86 @@ const Dashboard: React.FC = () => {
   const [isSidebarOpen, setSidebarOpen] = React.useState(true);
   const [activeTab, setActiveTab] = React.useState('overview');
   const indicatorRef = React.useRef<HTMLDivElement>(null);
+
+  // Calendar data state
+  const [employeesOnLeaveToday, setEmployeesOnLeaveToday] = React.useState<EmployeeOnLeave[]>([]);
+  const [upcomingLeavesData, setUpcomingLeavesData] = React.useState<UpcomingLeave[]>([]);
+  const [calendarData, setCalendarData] = React.useState<CalendarData[]>([]);
+  const [isLoadingCalendar, setIsLoadingCalendar] = React.useState(false);
+
+  // API functions for calendar data
+  const fetchEmployeesOnLeaveToday = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/calendar/employees-on-leave-today`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setEmployeesOnLeaveToday(data.employees);
+      }
+    } catch (error) {
+      console.error('Error fetching employees on leave today:', error);
+    }
+  };
+
+  const fetchUpcomingLeaves = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/calendar/upcoming-leaves`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUpcomingLeavesData(data.leaves);
+      }
+    } catch (error) {
+      console.error('Error fetching upcoming leaves:', error);
+    }
+  };
+
+  const fetchCalendarData = async (year: number, month: number) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/calendar/data?year=${year}&month=${month}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCalendarData(data.calendarData);
+      }
+    } catch (error) {
+      console.error('Error fetching calendar data:', error);
+    }
+  };
+
+  // Load calendar data on component mount
+  React.useEffect(() => {
+    const loadCalendarData = async () => {
+      setIsLoadingCalendar(true);
+      await Promise.all([
+        fetchEmployeesOnLeaveToday(),
+        fetchUpcomingLeaves(),
+        fetchCalendarData(new Date().getFullYear(), new Date().getMonth() + 1)
+      ]);
+      setIsLoadingCalendar(false);
+    };
+    loadCalendarData();
+  }, []);
+
+  // Refresh calendar data function
+  const refreshCalendarData = async () => {
+    setIsLoadingCalendar(true);
+    await Promise.all([
+      fetchEmployeesOnLeaveToday(),
+      fetchUpcomingLeaves(),
+      fetchCalendarData(new Date().getFullYear(), new Date().getMonth() + 1)
+    ]);
+    setIsLoadingCalendar(false);
+  };
 
   const toggleSidebar = () => {
     setSidebarOpen(!isSidebarOpen);
@@ -386,25 +483,73 @@ const Dashboard: React.FC = () => {
 
   const holidayDates = allHolidays.map(h => new Date(h.date.replace(/-/g, '/')));
 
+  // Function to get leave info for a date
+  const getLeaveInfo = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+    
+    return calendarData.filter(leave => {
+      const startDate = new Date(leave.startDate);
+      const endDate = new Date(leave.endDate);
+      const currentDate = new Date(dateString);
+      return currentDate >= startDate && currentDate <= endDate;
+    });
+  };
+
   const CustomDay = (props: DayProps) => {
     const holidayInfo = getHolidayInfo(props.date);
-    if (holidayInfo) {
-      return (
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="relative w-full h-full flex items-center justify-center">
-                <DefaultDay {...props} />
+    const leaveInfo = getLeaveInfo(props.date);
+    
+    return (
+      <TooltipProvider delayDuration={100}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="relative w-full h-full flex items-center justify-center">
+              <DefaultDay {...props} />
+              {leaveInfo.length > 0 && (
+                <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2">
+                  <div className="flex gap-0.5">
+                    {leaveInfo.slice(0, 3).map((leave, index) => (
+                      <div
+                        key={index}
+                        className={`w-1 h-1 rounded-full ${
+                          leave.type === 'SL' ? 'bg-red-500' :
+                          leave.type === 'CL' ? 'bg-blue-500' :
+                          leave.type === 'PL' ? 'bg-green-500' : 'bg-gray-500'
+                        }`}
+                      />
+                    ))}
+                    {leaveInfo.length > 3 && (
+                      <div className="w-1 h-1 rounded-full bg-gray-400" />
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            {holidayInfo && (
+              <div className="mb-2">
+                <p className="font-semibold text-green-700">{holidayInfo.name}</p>
+                <p className="text-sm text-green-600">{holidayInfo.type}</p>
               </div>
-            </TooltipTrigger>
-            <TooltipContent className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/80 dark:text-green-300 dark:border-green-800">
-              <p className="font-semibold">{holidayInfo.name}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    }
-    return <DefaultDay {...props} />;
+            )}
+            {leaveInfo.length > 0 && (
+              <div>
+                <p className="font-semibold text-blue-700 mb-1">Employees on Leave:</p>
+                {leaveInfo.map((leave, index) => (
+                  <div key={index} className="text-sm text-blue-600">
+                    • {leave.employeeName} ({leave.type})
+                  </div>
+                ))}
+              </div>
+            )}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
   };
 
   // Filter holidays to show only upcoming ones from current date
@@ -772,6 +917,28 @@ const Dashboard: React.FC = () => {
                               </div>
                             ))}
                           </div>
+                          {/* Calendar Legend */}
+                          <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                            <h4 className="text-sm font-semibold mb-2">Calendar Legend</h4>
+                            <div className="flex flex-wrap gap-4 text-xs">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                <span>Sick Leave (SL)</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                                <span>Casual Leave (CL)</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                <span>Paid Leave (PL)</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                                <span>Other Leave (OL)</span>
+                              </div>
+                            </div>
+                          </div>
                         </CardContent>
                       </Card>
                     </div>
@@ -878,7 +1045,19 @@ const Dashboard: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                       <Card className="lg:col-span-2">
                         <CardHeader>
-                          <CardTitle>Company Calendar</CardTitle>
+                          <div className="flex justify-between items-center">
+                            <CardTitle>Company Calendar</CardTitle>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={refreshCalendarData}
+                              disabled={isLoadingCalendar}
+                              className="flex items-center gap-2"
+                            >
+                              <RefreshCw className={`h-4 w-4 ${isLoadingCalendar ? 'animate-spin' : ''}`} />
+                              Refresh
+                            </Button>
+                          </div>
                         </CardHeader>
                         <CardContent>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -941,17 +1120,36 @@ const Dashboard: React.FC = () => {
                             <CardTitle>On Leave Today</CardTitle>
                           </CardHeader>
                           <CardContent>
-                            <div className="space-y-4">
-                              {onLeaveToday.map((leave) => (
-                                <div key={leave.name} className="flex items-center justify-between">
-                                  <div>
-                                    <div className="font-medium">{leave.name}</div>
-                                    <div className="text-sm text-muted-foreground">{leave.team}</div>
-                                  </div>
-                                  <Badge variant="secondary">{leave.type}</Badge>
+                            {isLoadingCalendar ? (
+                              <div className="space-y-4">
+                                <div className="animate-pulse">
+                                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                                 </div>
-                              ))}
-                            </div>
+                                <div className="animate-pulse">
+                                  <div className="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
+                                  <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                                </div>
+                              </div>
+                            ) : employeesOnLeaveToday.length > 0 ? (
+                              <div className="space-y-4">
+                                {employeesOnLeaveToday.map((leave) => (
+                                  <div key={leave.name} className="flex items-center justify-between">
+                                    <div>
+                                      <div className="font-medium">{leave.name}</div>
+                                      <div className="text-sm text-muted-foreground">
+                                        {new Date(leave.startDate).toLocaleDateString()} - {new Date(leave.endDate).toLocaleDateString()}
+                                      </div>
+                                    </div>
+                                    <Badge variant="secondary">{leave.type}</Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center text-muted-foreground py-4">
+                                No employees on leave today
+                              </div>
+                            )}
                           </CardContent>
                         </Card>
                         <Card>
@@ -959,19 +1157,36 @@ const Dashboard: React.FC = () => {
                             <CardTitle>Upcoming Leaves</CardTitle>
                           </CardHeader>
                           <CardContent>
-                            <div className="space-y-4">
-                              {upcomingLeaves.map((leave) => (
-                                <div key={leave.name} className="flex items-center justify-between">
-                                  <div>
-                                    <div className="font-medium">{leave.name}</div>
-                                    <div className="text-sm text-muted-foreground">{leave.date}</div>
-                                  </div>
-                                  <Badge variant="outline">{leave.team}</Badge>
+                            {isLoadingCalendar ? (
+                              <div className="space-y-4">
+                                <div className="animate-pulse">
+                                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                                 </div>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
+                                <div className="animate-pulse">
+                                  <div className="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                </div>
+              </div>
+            ) : upcomingLeavesData.length > 0 ? (
+              <div className="space-y-4">
+                {upcomingLeavesData.map((leave) => (
+                  <div key={leave.name} className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{leave.name}</div>
+                      <div className="text-sm text-muted-foreground">{leave.date}</div>
+                    </div>
+                    <Badge variant="outline">{leave.type}</Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-4">
+                No upcoming leaves
+              </div>
+            )}
+          </CardContent>
+        </Card>
                       </div>
                     </div>
                   </TabsContent>
